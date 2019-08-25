@@ -1,12 +1,12 @@
 #pragma once
-#include <cmath>
+#include <math.h>
 namespace simple {
 
 	namespace math {
-		// Primitives
-		constexpr float Pi = 3.141592741f;
+		// Math ops
+		constexpr float Pi = 3.14159265358979323846f;
 		constexpr float Epsilon = 0.0001f;
-		constexpr float Root2 = 1.41421356237f;
+		constexpr float Root2 = 1.41421356237309504880f;
 
 		inline float Sin(float rad) { return sinf(rad); }
 		inline float Cos(float rad) { return cosf(rad); }
@@ -35,23 +35,8 @@ namespace simple {
 				y = y_;
 			}
 
-			void Rotate(float radians) {
-				float c = Cos(radians);
-				float s = Sin(radians);
-
-				float xp = x * c - y * s;
-				float yp = x * s + y * c;
-
-				x = xp;
-				y = yp;
-			}
-
-			float LenSqr() const {
-				return x * x + y * y;
-			}
-
 			float Len() const {
-				return sqrt(x * x + y * y);
+				return Sqrt((x * x) + (y * y));
 			}
 
 			vec2 operator + (const vec2& v) const {
@@ -96,10 +81,21 @@ namespace simple {
 		};
 
 		// Vector ops
+		inline float VecDot(const vec2& a, const vec2& b) { return (a.x * b.x) + (a.y * b.y); }
+		inline float VecSqr(const vec2& v) { return (v.x * v.x) + (v.y * v.y); }
+
 		inline vec2 VecAbs(vec2 v) { return vec2(Abs(v.x), Abs(v.y)); }
 		inline vec2 VecMin(vec2 a, vec2 b) { return vec2(Min(a.x, b.x), Min(a.y, b.y)); }
 		inline vec2 VecMax(vec2 a, vec2 b) { return vec2(Max(a.x, b.x), Max(a.y, b.y)); }
 		inline vec2 VecClamp(vec2 v, vec2 min, vec2 max) { return VecMin(max, VecMax(min, v)); }
+		inline vec2 VecNorm(const vec2& v) {
+			if (v.Len() < Epsilon)
+				return vec2();
+
+			float r = 1 / v.Len();
+			return v * r;
+		}
+		
 
 		struct mat3 {
 
@@ -148,35 +144,52 @@ namespace simple {
 					}
 				return out;
 			}
+
 		};
 
+	} // Math end
 
-		inline float VecDot(const vec2& a, const vec2& b) {
-			return (a.x * b.x) + (a.y * b.y);
-		};
 
-		inline float VecSqr(const vec2& v) {
-			return (v.x * v.x) + (v.y * v.y);
-		};
-
-		inline vec2 VecNorm(const vec2& v) {
-			if (v.Len() > Epsilon) {
-				float r = 1 / v.Len();
-				return v * r;
-			}
-			return vec2();
-		};
-
+	namespace time {
+		float DeltaTime();
 	}
 
 
 	namespace camera {
-	// TO-DO
-	// Local to World ect
-	}
+
+		struct view_port {
+			math::vec2 offset;
+			float width, height;
+			float scale = 1;
+
+			math::vec2 Min() const {
+				return offset;
+			}
+			math::vec2 Max() const {
+				return (math::vec2(width, height) / scale) + offset;
+			}
+
+			void Set(const math::vec2& vec);
+			void Set(float x, float y);
+
+			void Pan(const math::vec2& vec);
+			void Pan(float x, float y);
+
+			void Zoom(float val, const math::vec2& vec = { 0.0f, 0.0f });
+			void Zoom(float val, int x = 0, int y = 0);
+		};
+
+		math::vec2 WorldToPort(const view_port& port, const math::vec2& vec);
+		math::vec2 WorldToPort(const view_port& port, const float x, const float y);
+
+		math::vec2 PortToWorld(const view_port& port, const math::vec2& vec);
+		math::vec2 PortToWorld(const view_port& port, const float x, const float y);
+
+	} // Camera end
+
 
 	namespace structure {
-
+		// Move to math?
 		struct rotation {
 			float cos;
 			float sin;
@@ -186,7 +199,7 @@ namespace simple {
 			math::vec2 pos;
 			rotation rot;
 		};
-	}
+	} // Structure end
 
 	namespace collision {
 
@@ -211,15 +224,15 @@ namespace simple {
 			struct capsule {
 				math::vec2 start;
 				math::vec2 end;
-				float radius;
+				float radius = 0.0f;
 			};
 
 			struct poly {
-				int nVertex;
+				int nVertex = 0;
 				math::vec2 vertex[MaxVertexCount];
 				math::vec2 norms[MaxVertexCount];
 			};
-		};
+		}
 
 		struct manifold {
 			int count;
@@ -227,29 +240,6 @@ namespace simple {
 
 			math::vec2 contact_points[2];
 		};
-
-		
-		// Box ops
-
-		body::poly BoxToPoly(body::box& box) {
-			body::poly out;
-			out.nVertex = 4;
-			out.vertex[0] = box.min;
-			out.vertex[1] = math::vec2(box.max.x, box.min.y);
-			out.vertex[2] = box.max;
-			out.vertex[3] = math::vec2(box.min.x, box.max.y);
-			return out;
-		};
-
-
-		// Poly math
-
-		inline void poly_add(body::poly& poly, float x, float y) {
-			for (int i = 0; i < poly.nVertex; i++) {
-				poly.vertex[i].x += x;
-				poly.vertex[i].y += y;
-			}
-		}
 
 
 		int PointVsCircle(math::vec2& point, body::circle& circle);
@@ -265,9 +255,72 @@ namespace simple {
 		int BoxVsBox(body::box& a, body::box& b);
 		int BoxVsCapsule(body::box& box, body::capsule& capsule);
 		int BoxVsPoly(body::box& box, body::poly& poly);
+		
+		int CapsuleVsCapsule(body::capsule& a, body::capsule& b);
+		int CapsuleVsPoly(body::capsule& capsule, body::poly& poly);
+
+		int PolyVsPoly(body::poly& a, body::poly& b);
+	} // Collision end
+
+} // simple end
 
 
-#ifndef SIMPLE_COLLISION_FUNCTIONS
+namespace simple {
+
+	namespace camera {
+
+		math::vec2 WorldToPort(const view_port& port, const math::vec2& vec) {
+			return (vec - port.offset) * port.scale;
+		}
+
+		math::vec2 WorldToPort(const view_port& port, const float x, const float y) {
+			return (math::vec2(x, y) - port.offset) * port.scale;
+		}
+
+		math::vec2 PortToWorld(const view_port& port, const math::vec2& vec) {
+			return (vec / port.scale) + port.offset;
+		}
+
+		math::vec2 PortToWorld(const view_port& port, const float x, const float y) {
+			return (math::vec2(x, y) / port.scale) + port.offset;
+		}
+
+		void view_port::Set(const math::vec2& vec) {
+			offset = vec;
+		}
+		
+		void view_port::Set(float x, float y) {
+			offset.x = x;
+			offset.y = y;
+		}
+
+		void view_port::Pan(const math::vec2& vec) {
+			offset += vec / scale;
+		}
+		
+		void view_port::Pan(float x, float y) {
+			offset.x += x / scale;
+			offset.y += y / scale;
+		}
+
+		void view_port::Zoom(float val, const math::vec2& vec) {
+			math::vec2 initial = PortToWorld(*this, vec);
+			scale *= val;
+			math::vec2 finish = PortToWorld(*this, vec);
+			Set(offset + (initial - finish));
+		}
+
+		void view_port::Zoom(float val, int x, int y) {
+			math::vec2 initial = PortToWorld(*this, x, y);
+			scale *= val;
+			math::vec2 finish = PortToWorld(*this, x, y);
+			Set(offset + (initial - finish));
+		}
+		
+	} // Camera end
+
+
+	namespace collision {
 
 		int PointVsCircle(math::vec2& point, body::circle& circle) {
 			math::vec2 adjusted_point = point - circle.position;
@@ -279,14 +332,15 @@ namespace simple {
 
 		int PointVsBox(math::vec2& point, body::box& box) {
 			return (point.x >= box.min.x && point.x <= box.max.x
-				 && point.y >= box.min.y && point.y <= box.max.y);
+				&& point.y >= box.min.y && point.y <= box.max.y);
 		}
 
 		int PointVsCapsule(math::vec2& point, body::capsule& capsule) {
 
 			float length_sqr = math::VecSqr(capsule.end - capsule.start);
-			if (length_sqr == 0.0f) 
-				return math::VecSqr( point - capsule.start) <= math::Sqr(capsule.radius);
+			if (length_sqr == 0.0f)
+				return math::VecSqr(point - capsule.start) <= math::Sqr(capsule.radius);
+
 			float t = math::Clamp(math::VecDot(point - capsule.start, capsule.end - capsule.start) / length_sqr, 0.0f, 1.0f);
 			math::vec2 projection = capsule.start + ((capsule.end - capsule.start) * t);
 			float dist_sqr = math::VecSqr(projection - point);
@@ -342,23 +396,6 @@ namespace simple {
 			return dist_sqr <= math::Sqr(capsule.radius + circle.radius);
 		}
 
-		int CircleVsPoly(body::circle& circle, body::poly& poly) {
-			for (int i = 0; i < poly.nVertex; i++) {
-				math::vec2 start = poly.vertex[i];
-				math::vec2 end = poly.vertex[(i + 1) % poly.nVertex];
-
-				math::vec2 face_direction = math::VecNorm(end - start);
-				math::vec2 face_normal = { face_direction.y * -1, face_direction.x };
-
-				float point_along_normal = math::VecDot(circle.position, face_normal);
-				float face_along_normal = math::VecDot(start, face_normal);
-
-				if (point_along_normal + circle.radius <= face_along_normal)
-					return 0;
-			}
-			return 1;
-		}
-
 
 		// box collisions
 
@@ -371,7 +408,8 @@ namespace simple {
 			return (mLeft <= 0 && mRight >= 0 && mTop <= 0 && mBot >= 0);
 		}
 
-		// util
+
+		// Temp util
 
 		void build_regular_poly(int nSides, float side_length, body::poly& out) {
 
@@ -381,11 +419,24 @@ namespace simple {
 
 			for (int i = 0; i < nSides; i++) {
 				out.vertex[i] = { side_length * math::Cos(ang * i), side_length * math::Sin(ang * i) };
-			}
+		}	}
+
+		body::poly BoxToPoly(simple::collision::body::box& box) {
+			simple::collision::body::poly out;
+			out.nVertex = 4;
+			out.vertex[0] = box.min;
+			out.vertex[1] = simple::math::vec2(box.max.x, box.min.y);
+			out.vertex[2] = box.max;
+			out.vertex[3] = simple::math::vec2(box.min.x, box.max.y);
+			return out;
 		}
 
-#define SIMPLE_COLLISION_FUNCTIONS
-#endif
-	}
+		inline void poly_add(body::poly& poly, float x, float y) {
+			for (int i = 0; i < poly.nVertex; i++) {
+				poly.vertex[i].x += x;
+				poly.vertex[i].y += y;
+		}	}
+		
+	} // Collision end
 
-}
+} // Simple end
