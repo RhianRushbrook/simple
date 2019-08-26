@@ -1,5 +1,5 @@
 #pragma once
-#include <math.h>
+#include <cmath>
 namespace simple {
 
 	namespace math {
@@ -8,8 +8,8 @@ namespace simple {
 		constexpr float Epsilon = 0.0001f;
 		constexpr float Root2 = 1.41421356237309504880f;
 
-		inline float Sin(float rad) { return sinf(rad); }
-		inline float Cos(float rad) { return cosf(rad); }
+		inline float Sin(float rad) { return std::sinf(rad); }
+		inline float Cos(float rad) { return std::cosf(rad); }
 		inline float DegToRad(float deg) { return (deg * Pi / 180); }
 		inline float RadToDeg(float rad) { return (rad * 180 / Pi); }
 		inline float Min(float a, float b) {return ((a) < (b) ? (a) : (b)); }
@@ -18,7 +18,7 @@ namespace simple {
 		inline float Clamp(float val, float min, float max) { return Max(min, Min(val, max)); }
 		inline float Sign(float val) { return (val < 0 ? -1.0f : 1.0f); }
 		inline float Sqr(float val) { return (val * val); }
-		inline float Sqrt(float val) { return sqrt(val); }
+		inline float Sqrt(float val) { return std::sqrt(val); }
 
 		// Structures
 		struct vec2 {
@@ -39,45 +39,16 @@ namespace simple {
 				return Sqrt((x * x) + (y * y));
 			}
 
-			vec2 operator + (const vec2& v) const {
-				return vec2(x + v.x, y + v.y);
-			}
-
-			vec2 operator + (float f) const {
-				return vec2(x + f, y + f);
-			}
-
-			vec2 operator - (const vec2& v) const {
-				return vec2(x - v.x, y - v.y);
-			}
-
-			vec2 operator * (const float& f) const {
-				return vec2(x * f, y * f);
-			}
-
-			vec2 operator / (const float& f) const {
-				return vec2(x / f, y / f);
-			}
-
-			vec2& operator += (const vec2& v) {
-				this->x += v.x;	this->y += v.y;
-				return *this;
-			}
-
-			vec2& operator -= (const vec2& v) {
-				this->x -= v.x;	this->y -= v.y;
-				return *this;
-			}
-
-			vec2& operator *= (const float f) {
-				this->x *= f;	this->y *= f;
-				return *this;
-			}
-
-			vec2& operator /= (const float f) {
-				this->x /= f;	this->y /= f;
-				return *this;
-			}
+			vec2  operator +  (const vec2&  v) const { return vec2(x + v.x, y + v.y); }
+			vec2  operator +  (const float& f) const { return vec2(x + f, y + f); }
+			vec2  operator -  (const vec2&  v) const { return vec2(x - v.x, y - v.y); }
+			vec2  operator -  (const float& f) const { return vec2(x - f, y - f); }
+			vec2  operator *  (const float& f) const { return vec2(x * f, y * f); }
+			vec2  operator /  (const float& f) const { return vec2(x / f, y / f); }
+			vec2& operator += (const vec2& v) { x += v.x;	y += v.y; return *this; }
+			vec2& operator -= (const vec2& v) { x -= v.x;	y -= v.y; return *this; }
+			vec2& operator *= (const float f) { x *= f;	y *= f;	return *this; }
+			vec2& operator /= (const float f) { x /= f;	y /= f;	return *this; }
 		};
 
 		// Vector ops
@@ -89,8 +60,7 @@ namespace simple {
 		inline vec2 VecMax(vec2 a, vec2 b) { return vec2(Max(a.x, b.x), Max(a.y, b.y)); }
 		inline vec2 VecClamp(vec2 v, vec2 min, vec2 max) { return VecMin(max, VecMax(min, v)); }
 		inline vec2 VecNorm(const vec2& v) {
-			if (v.Len() < Epsilon)
-				return vec2();
+			if (v.Len() < Epsilon) { return vec2(); }
 
 			float r = 1 / v.Len();
 			return v * r;
@@ -323,11 +293,9 @@ namespace simple {
 	namespace collision {
 
 		int PointVsCircle(math::vec2& point, body::circle& circle) {
-			math::vec2 adjusted_point = point - circle.position;
-			float point_distance = math::VecSqr(adjusted_point);
-			float circle_radius = circle.radius * circle.radius;
+			float sqr_distance = math::VecSqr(point - circle.position);
 
-			return (point_distance <= circle_radius);
+			return (sqr_distance <= math::Sqr(circle.radius));
 		}
 
 		int PointVsBox(math::vec2& point, body::box& box) {
@@ -336,28 +304,21 @@ namespace simple {
 		}
 
 		int PointVsCapsule(math::vec2& point, body::capsule& capsule) {
+			float sqr_length = math::VecSqr(capsule.end - capsule.start);
+			if (sqr_length == 0.0f)
+				return (math::VecSqr(point - capsule.start) <= math::Sqr(capsule.radius));
 
-			float length_sqr = math::VecSqr(capsule.end - capsule.start);
-			if (length_sqr == 0.0f)
-				return math::VecSqr(point - capsule.start) <= math::Sqr(capsule.radius);
-
-			float t = math::Clamp(math::VecDot(point - capsule.start, capsule.end - capsule.start) / length_sqr, 0.0f, 1.0f);
+			float t = math::Clamp(math::VecDot(point - capsule.start, capsule.end - capsule.start) / sqr_length, 0.0f, 1.0f);
 			math::vec2 projection = capsule.start + ((capsule.end - capsule.start) * t);
-			float dist_sqr = math::VecSqr(projection - point);
+			float sqr_distance = math::VecSqr(projection - point);
 
-			return dist_sqr <= math::Sqr(capsule.radius);
+			return (sqr_distance <= math::Sqr(capsule.radius));
 		}
 
 		int PointVsPoly(math::vec2& point, body::poly& poly) {
 			for (int i = 0; i < poly.nVertex; i++) {
-				math::vec2 start = poly.vertex[i];
-				math::vec2 end = poly.vertex[(i + 1) % poly.nVertex];
-
-				math::vec2 face_direction = math::VecNorm(end - start);
-				math::vec2 face_normal = { face_direction.y * -1, face_direction.x };
-
-				float point_along_normal = math::VecDot(point, face_normal);
-				float face_along_normal = math::VecDot(start, face_normal);
+				float point_along_normal = math::VecDot(point, poly.norms[i]);
+				float face_along_normal = math::VecDot(poly.vertex[i], poly.norms[i]);
 
 				if (point_along_normal <= face_along_normal)
 					return 0;
@@ -369,31 +330,30 @@ namespace simple {
 		// Circle collisions
 
 		int CircleVsCircle(body::circle& circle1, body::circle& circle2) {
-			math::vec2 local_space = circle2.position - circle1.position;
-			float circle_distance = math::VecSqr(local_space);
-			float combined_radius = math::Sqr(circle1.radius + circle2.radius);
+			float sqr_distance = math::VecSqr(circle2.position - circle1.position);
+			float sqr_radius = math::Sqr(circle1.radius + circle2.radius);
 
-			return (circle_distance <= combined_radius);
+			return (sqr_distance <= sqr_radius);
 		}
 
-
 		int CircleVsBox(body::circle& circle, body::box& box) {
-			math::vec2 a = circle.position;
-			math::vec2 b = math::VecClamp(a, box.min, box.max);
-			math::vec2 ab = b - a;
+			math::vec2 projected_circle = math::VecClamp(circle.position, box.min, box.max);
+			float sqr_distance = math::VecSqr(projected_circle - circle.position);
 
-			return math::VecSqr(ab) <= math::Sqr(circle.radius);
+			return (sqr_distance <= math::Sqr(circle.radius));
 		}
 
 		int CircleVsCapsule(body::circle& circle, body::capsule& capsule) {
-			float length_sqr = math::VecSqr(capsule.end - capsule.start);
-			if (length_sqr == 0.0f)
-				return math::VecSqr(circle.position - capsule.start) <= math::Sqr(capsule.radius + circle.radius);
-			float t = math::Clamp(math::VecDot(circle.position - capsule.start, capsule.end - capsule.start) / length_sqr, 0.0f, 1.0f);
-			math::vec2 projection = capsule.start + ((capsule.end - capsule.start) * t);
-			float dist_sqr = math::VecSqr(projection - circle.position);
+			float sqr_length = math::VecSqr(capsule.end - capsule.start);
+			float sqr_radius = math::Sqr(capsule.radius + circle.radius);
+			if (sqr_length == 0.0f)
+				return (math::VecSqr(circle.position - capsule.start) <= sqr_radius);
 
-			return dist_sqr <= math::Sqr(capsule.radius + circle.radius);
+			float t = math::Clamp(math::VecDot(circle.position - capsule.start, capsule.end - capsule.start) / sqr_length, 0.0f, 1.0f);
+			math::vec2 projection = capsule.start + ((capsule.end - capsule.start) * t);
+			float sqr_distance = math::VecSqr(projection - circle.position);
+
+			return sqr_distance <= sqr_radius;
 		}
 
 
@@ -419,6 +379,10 @@ namespace simple {
 
 			for (int i = 0; i < nSides; i++) {
 				out.vertex[i] = { side_length * math::Cos(ang * i), side_length * math::Sin(ang * i) };
+			}
+			for (int i = 0; i < nSides; i++) {
+				math::vec2 plane = out.vertex[(i + 1) % nSides] - out.vertex[i];
+				out.norms[i] = { -plane.y, plane.x };
 		}	}
 
 		body::poly BoxToPoly(simple::collision::body::box& box) {
